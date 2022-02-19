@@ -4,7 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using WebApplication1.Models;
+using WebAppBL;
+using WebAppBL.Models;
 
 namespace WebApplication1.Controllers
 {
@@ -12,28 +13,27 @@ namespace WebApplication1.Controllers
     [Route("[controller]")]
     public class ProductController : ControllerBase
     {
-        private static List<Product> _products;
+        private readonly ProductService _productsService;
         private readonly ILogger<ProductController> _logger;
 
-        static ProductController()
-        {
-            _products = new List<Product>();
-        }
-        public ProductController(ILogger<ProductController> logger)
+        public ProductController(
+            ILogger<ProductController> logger,
+            ProductService productsService)
         {
             _logger = logger;
+            _productsService = productsService;
         }
 
         [HttpGet]
-        public IActionResult GetProductsList()
+        public IActionResult GetAllProducts()
         {
-            return Ok(_products);
+            return Ok(_productsService.GetAllProducts());
         }
 
         [HttpGet("{id}")]
         public IActionResult GetProduct(Guid id)
         {
-            Product product = _products.FirstOrDefault(x => x.Id == id);
+            Product product = _productsService.GetProductById(id);
             if (product != null)
             {
                 return Ok(product);
@@ -45,39 +45,37 @@ namespace WebApplication1.Controllers
         [HttpPost]
         public IActionResult AddProduct(Product product)
         {
-            product.Id = Guid.NewGuid();
-            _products.Add(product);
+            if (product != null)
+            {
+                Guid createdGuid;
+                try
+                {
+                    createdGuid = _productsService.AddProduct(product);
+                }
+                catch (ArgumentException ex)
+                {
+                    return BadRequest(ex.Message);
+                }
 
-            return Created(product.Id.ToString(), product);
+                return Created(createdGuid.ToString(), product);
+            }
+
+            return BadRequest();
         }
 
         [HttpPut]
         public IActionResult UpdateProduct(Product product)
         {
-            Product dbProduct = _products.FirstOrDefault(x => x.Id == product.Id);
-            if (dbProduct != null)
-            {
-                int index = _products.IndexOf(dbProduct);
-                _products[index] = product;
-                
-                return Ok(product);
-            }
-
-            return NotFound();
+            var successed = _productsService.UpdateProduct(product);
+            return StatusCode(successed ? 200 : 404);
         }
 
         [HttpDelete("{id}")]
         public IActionResult DeleteProduct(Guid id)
         {
-            Product dbProduct = _products.FirstOrDefault(x => x.Id == id);
-            if (dbProduct != null)
-            { 
-                _products.Remove(dbProduct);
+            var successed = _productsService.RemoveProduct(id);
 
-                return Ok(dbProduct);
-            }
-
-            return NotFound();
+            return StatusCode(successed ? 200 : 404);
         }
     }
 }
